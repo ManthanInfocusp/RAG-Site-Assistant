@@ -8,10 +8,14 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.core.config import settings
+
+# pgvector IVFFlat defaults to probes=1, which can return zero rows on small
+# indexes (e.g. lists=100 with ~50 chunks). Tune per connection instead.
+IVFFLAT_PROBES = 10
 
 
 class Base(DeclarativeBase):
@@ -25,6 +29,13 @@ engine = create_engine(
     max_overflow=20,
     future=True,
 )
+
+
+@event.listens_for(engine, "connect")
+def _set_pgvector_probes(dbapi_connection, _connection_record) -> None:
+    with dbapi_connection.cursor() as cursor:
+        cursor.execute(f"SET ivfflat.probes = {IVFFLAT_PROBES}")
+
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
 

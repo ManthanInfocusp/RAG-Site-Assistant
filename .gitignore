@@ -11,6 +11,7 @@ venv/
 
 node_modules/
 dist/
+DummyFrontend/
 .vite/
 .next/
 
