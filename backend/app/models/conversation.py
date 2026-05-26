@@ -17,7 +17,7 @@ class Conversation(Base, TimestampMixin):
     )
     visitor_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
 
-    messages: Mapped[list["Message"]] = relationship(
+    messages: Mapped[list[Message]] = relationship(
         "Message",
         back_populates="conversation",
         cascade="all, delete-orphan",
@@ -39,4 +39,4 @@ class Message(Base, TimestampMixin):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     citations: Mapped[list[dict]] = mapped_column(JSONB, nullable=False, default=list)
 
-    conversation: Mapped["Conversation"] = relationship("Conversation", back_populates="messages")
+    conversation: Mapped[Conversation] = relationship("Conversation", back_populates="messages")

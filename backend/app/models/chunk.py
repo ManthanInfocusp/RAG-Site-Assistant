@@ -32,4 +32,4 @@ class Chunk(Base, TimestampMixin):
     embedding: Mapped[list[float]] = mapped_column(Vector(settings.embed_dim), nullable=False)
     chunk_metadata: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
-    document: Mapped["Document"] = relationship("Document", back_populates="chunks")  # noqa: F821
+    document: Mapped[Document] = relationship("Document", back_populates="chunks")  # noqa: F821

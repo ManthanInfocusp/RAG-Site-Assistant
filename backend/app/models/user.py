@@ -15,6 +15,6 @@ class User(Base, TimestampMixin):
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
-    sites: Mapped[list["Site"]] = relationship(  # noqa: F821
+    sites: Mapped[list[Site]] = relationship(  # noqa: F821
         "Site", back_populates="owner", cascade="all, delete-orphan"
     )

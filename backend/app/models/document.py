@@ -25,9 +25,9 @@ class Document(Base, TimestampMixin):
     raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
 
-    data_source: Mapped["DataSource"] = relationship(  # noqa: F821
+    data_source: Mapped[DataSource] = relationship(  # noqa: F821
         "DataSource", back_populates="documents"
     )
-    chunks: Mapped[list["Chunk"]] = relationship(  # noqa: F821
+    chunks: Mapped[list[Chunk]] = relationship(  # noqa: F821
         "Chunk", back_populates="document", cascade="all, delete-orphan"
     )

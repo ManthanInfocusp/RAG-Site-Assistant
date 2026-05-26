@@ -28,8 +28,8 @@ class Site(Base, TimestampMixin):
     # Theme + welcome message + persona configurable per site
     widget_config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
 
-    owner: Mapped["User"] = relationship("User", back_populates="sites")  # noqa: F821
-    data_sources: Mapped[list["DataSource"]] = relationship(  # noqa: F821
+    owner: Mapped[User] = relationship("User", back_populates="sites")  # noqa: F821
+    data_sources: Mapped[list[DataSource]] = relationship(  # noqa: F821
         "DataSource", back_populates="site", cascade="all, delete-orphan"
     )
 

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 
@@ -53,7 +53,7 @@ def ingest_data_source(self, data_source_id: str) -> dict:
 
         src.status = "ready"
         src.stats = stats
-        src.last_synced_at = datetime.now(timezone.utc)
+        src.last_synced_at = datetime.now(UTC)
         db.commit()
         return {"status": "ready", **stats}
     finally:

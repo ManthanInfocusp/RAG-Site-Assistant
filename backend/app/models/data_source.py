@@ -30,7 +30,7 @@ class DataSource(Base, TimestampMixin):
     stats: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     # {"pages": int, "documents": int, "chunks": int}
 
-    site: Mapped["Site"] = relationship("Site", back_populates="data_sources")  # noqa: F821
-    documents: Mapped[list["Document"]] = relationship(  # noqa: F821
+    site: Mapped[Site] = relationship("Site", back_populates="data_sources")  # noqa: F821
+    documents: Mapped[list[Document]] = relationship(  # noqa: F821
         "Document", back_populates="data_source", cascade="all, delete-orphan"
     )
