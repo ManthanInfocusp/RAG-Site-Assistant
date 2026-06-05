@@ -27,6 +27,7 @@ class ChatRequest(BaseModel):
     message: str
     conversation_id: str | None = None
     visitor_id: str | None = None
+    visitor_identifier: str | None = None
 
 
 def _sse_event(event: str, data: str) -> bytes:
@@ -60,7 +61,11 @@ def chat_stream(payload: ChatRequest, request: Request, db: DB):
         if not convo or convo.site_id != site.id:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Conversation not found")
     else:
-        convo = Conversation(site_id=site.id, visitor_id=payload.visitor_id)
+        convo = Conversation(
+            site_id=site.id,
+            visitor_id=payload.visitor_id,
+            visitor_identifier=payload.visitor_identifier,
+        )
         db.add(convo)
         db.commit()
         db.refresh(convo)

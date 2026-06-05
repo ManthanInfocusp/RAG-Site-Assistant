@@ -16,6 +16,7 @@ class Conversation(Base, TimestampMixin):
         String(36), ForeignKey("sites.id", ondelete="CASCADE"), index=True, nullable=False
     )
     visitor_id: Mapped[str | None] = mapped_column(String(64), index=True, nullable=True)
+    visitor_identifier: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     messages: Mapped[list[Message]] = relationship(
         "Message",

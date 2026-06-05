@@ -57,6 +57,28 @@ export const css = `
   align-items: center;
 }
 
+.rag-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.rag-header-logo {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.rag-launcher-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .rag-close {
   background: transparent;
   color: white;
@@ -64,6 +86,67 @@ export const css = `
   cursor: pointer;
   font-size: 18px;
   line-height: 1;
+}
+
+.rag-identity-form {
+  padding: 14px 16px;
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+  flex-shrink: 0;
+}
+
+.rag-identity-prompt {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.rag-identity-input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #0f172a;
+  outline: none;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+}
+
+.rag-identity-input:focus {
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 2px rgba(15,23,42,0.08);
+}
+
+.rag-identity-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rag-identity-submit {
+  background: #0f172a;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.rag-identity-skip {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  color: #64748b;
+  font-family: inherit;
+  text-decoration: underline;
+  padding: 0;
 }
 
 .rag-messages {

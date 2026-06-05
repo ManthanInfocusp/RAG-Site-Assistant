@@ -72,6 +72,23 @@ async function mount(cfg: ScriptConfig) {
     console.warn("[rag-widget] failed to load config", err);
   }
 
+  const logoUrl = widgetConfig.widget_config?.logo_url as string | undefined;
+  const siteName = escapeHtml(String(widgetConfig.name || "Site assistant"));
+
+  const collectIdentity = !!widgetConfig.widget_config?.collect_visitor_info;
+  const identityLabel = escapeHtml(
+    String(widgetConfig.widget_config?.visitor_info_label || "Enter your email or name to get started"),
+  );
+  const identityRequired = !!widgetConfig.widget_config?.visitor_info_required;
+  const IDENTITY_KEY = `rag-visitor-identifier-${cfg.siteKey}`;
+
+  let visitorIdentifier: string | null = null;
+  try {
+    visitorIdentifier = localStorage.getItem(IDENTITY_KEY);
+  } catch { /* ignore */ }
+
+  const needsIdentityForm = collectIdentity && !visitorIdentifier;
+
   const host = document.createElement("div");
   host.id = "rag-widget-host";
   document.body.appendChild(host);
@@ -83,20 +100,47 @@ async function mount(cfg: ScriptConfig) {
   const launcher = document.createElement("button");
   launcher.className = "rag-launcher";
   launcher.title = "Chat";
-  launcher.innerHTML = "&#128172;";
+  if (logoUrl) {
+    const img = document.createElement("img");
+    img.src = logoUrl;
+    img.alt = "";
+    img.className = "rag-launcher-logo";
+    launcher.appendChild(img);
+  } else {
+    launcher.innerHTML = "&#128172;";
+  }
   shadow.appendChild(launcher);
+
+  const headerLogoHtml = logoUrl
+    ? `<img class="rag-header-logo" src="${escapeHtml(logoUrl)}" alt="" aria-hidden="true" />`
+    : "";
+
+  const identityFormHtml = needsIdentityForm
+    ? `<div class="rag-identity-form">
+        <p class="rag-identity-prompt">${identityLabel}</p>
+        <input class="rag-identity-input" type="text" placeholder="e.g. you@example.com" />
+        <div class="rag-identity-actions">
+          <button class="rag-identity-submit">Start chat</button>
+          ${!identityRequired ? '<button class="rag-identity-skip">Skip</button>' : ""}
+        </div>
+      </div>`
+    : "";
 
   const panel = document.createElement("div");
   panel.className = "rag-panel";
   panel.innerHTML = `
     <div class="rag-header">
-      <span>${escapeHtml(String(widgetConfig.name || "Site assistant"))}</span>
+      <div class="rag-header-left">
+        ${headerLogoHtml}
+        <span>${siteName}</span>
+      </div>
       <button class="rag-close" title="Close">&times;</button>
     </div>
+    ${identityFormHtml}
     <div class="rag-messages"></div>
     <div class="rag-input-row">
-      <textarea class="rag-input" rows="1" placeholder="Ask a question…"></textarea>
-      <button class="rag-send">Send</button>
+      <textarea class="rag-input" rows="1" placeholder="Ask a question…" ${needsIdentityForm ? "disabled" : ""}></textarea>
+      <button class="rag-send" ${needsIdentityForm ? "disabled" : ""}>Send</button>
     </div>
   `;
   shadow.appendChild(panel);
@@ -108,6 +152,40 @@ async function mount(cfg: ScriptConfig) {
 
   launcher.addEventListener("click", () => panel.classList.toggle("open"));
   closeBtn.addEventListener("click", () => panel.classList.remove("open"));
+
+  if (needsIdentityForm) {
+    const identityFormEl = panel.querySelector(".rag-identity-form") as HTMLElement;
+    const identityInputEl = panel.querySelector(".rag-identity-input") as HTMLInputElement;
+    const identitySubmitEl = panel.querySelector(".rag-identity-submit") as HTMLButtonElement;
+    const identitySkipEl = panel.querySelector(".rag-identity-skip") as HTMLButtonElement | null;
+
+    function resolveIdentity(value: string | null) {
+      if (value) {
+        try { localStorage.setItem(IDENTITY_KEY, value); } catch { /* ignore */ }
+        visitorIdentifier = value;
+      }
+      identityFormEl.remove();
+      inputEl.disabled = false;
+      sendBtn.disabled = false;
+      inputEl.focus();
+    }
+
+    identitySubmitEl.addEventListener("click", () => {
+      const val = identityInputEl.value.trim();
+      if (identityRequired && !val) return;
+      resolveIdentity(val || null);
+    });
+
+    identityInputEl.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const val = identityInputEl.value.trim();
+        if (identityRequired && !val) return;
+        resolveIdentity(val || null);
+      }
+    });
+
+    identitySkipEl?.addEventListener("click", () => resolveIdentity(null));
+  }
 
   const visitorId = ensureVisitorId();
   let conversationId: string | null = null;
@@ -134,6 +212,7 @@ async function mount(cfg: ScriptConfig) {
         message: text,
         conversation_id: conversationId,
         visitor_id: visitorId,
+        visitor_identifier: visitorIdentifier,
       };
       let pendingCitations: Citation[] = [];
       for await (const ev of sseFetch(`${cfg.chatBase}/v1/chat/stream`, body)) {

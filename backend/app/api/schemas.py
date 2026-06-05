@@ -124,6 +124,7 @@ class ConversationOut(BaseModel):
     id: str
     site_id: str
     visitor_id: str | None
+    visitor_identifier: str | None
     created_at: datetime
     messages: list[MessageOut] = []
 

@@ -54,6 +54,7 @@ export interface Conversation {
   id: string;
   site_id: string;
   visitor_id: string | null;
+  visitor_identifier: string | null;
   created_at: string;
   messages: Message[];
 }

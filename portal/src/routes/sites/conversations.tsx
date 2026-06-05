@@ -35,7 +35,12 @@ export function ConversationsTab() {
                     selected === c.id ? "bg-slate-100 font-medium" : ""
                   }`}
                 >
-                  <div className="truncate">{c.visitor_id || c.id.slice(0, 8)}</div>
+                  <div className="truncate font-medium">
+                    {c.visitor_identifier || c.visitor_id || c.id.slice(0, 8)}
+                  </div>
+                  {c.visitor_identifier && (
+                    <div className="truncate text-xs text-slate-400">{c.visitor_id || c.id.slice(0, 8)}</div>
+                  )}
                   <div className="text-xs text-slate-500">
                     {new Date(c.created_at).toLocaleString()}
                   </div>
