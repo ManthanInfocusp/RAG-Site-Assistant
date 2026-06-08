@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models import Conversation, Message
+from app.models import Conversation, Message, Site
 from app.rag.embedder import get_embedder
 from app.rag.llm_client import get_llm_client
 from app.rag.prompts import PromptMessage, build_messages
@@ -49,19 +49,33 @@ def stream_answer(
 
     history = _load_history(db, conversation_id)
 
+    site = db.get(Site, site_id)
+    custom_system_prompt = site.system_prompt if site else None
+
     # Embed the user query.
     [query_vec] = embedder.embed([user_text])
 
-    # Retrieve site-scoped chunks.
+    # Retrieve site-scoped chunks and discard irrelevant ones.
     retriever = SiteScopedRetriever(db, site_id)
-    chunks = retriever.search(query_vec, k=settings.chat_max_context_chunks)
-
-    messages, citations = build_messages(user_text, chunks, history)
+    all_chunks = retriever.search(query_vec, k=settings.chat_max_context_chunks)
+    chunks = [c for c in all_chunks if c.distance <= settings.chat_context_distance_threshold]
 
     # Persist the user message immediately so a refresh shows it.
     user_msg = Message(conversation_id=conversation_id, role="user", content=user_text)
     db.add(user_msg)
     db.commit()
+
+    # No relevant context found — return a canned response without calling the LLM.
+    if not chunks:
+        fallback = "I don't have information about that in this site's knowledge base."
+        yield ("citations", "[]")
+        yield ("delta", fallback)
+        db.add(Message(conversation_id=conversation_id, role="assistant", content=fallback, citations=[]))
+        db.commit()
+        yield ("done", _json_safe({"conversation_id": conversation_id}))
+        return
+
+    messages, citations = build_messages(user_text, chunks, history, custom_system_prompt=custom_system_prompt)
 
     yield ("citations", _json_safe(citations))
 
@@ -72,14 +86,12 @@ def stream_answer(
 
     answer = "".join(answer_chunks)
 
-    # Persist the assistant message + citations.
-    assistant_msg = Message(
+    db.add(Message(
         conversation_id=conversation_id,
         role="assistant",
         content=answer,
         citations=citations,
-    )
-    db.add(assistant_msg)
+    ))
     db.commit()
 
     yield ("done", _json_safe({"conversation_id": conversation_id}))

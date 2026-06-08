@@ -41,6 +41,7 @@ class SiteUpdate(BaseModel):
     name: str | None = None
     allowed_origins: str | None = None
     widget_config: dict | None = None
+    system_prompt: str | None = None
 
 
 class SiteOut(BaseModel):
@@ -49,6 +50,7 @@ class SiteOut(BaseModel):
     allowed_origins: str
     public_key: str
     widget_config: dict
+    system_prompt: str | None
     created_at: datetime
 
     class Config:
@@ -62,6 +64,7 @@ class UrlSourceCreate(BaseModel):
     url: str
     max_pages: int = 200
     max_depth: int = 3
+    resync_interval_hours: int = 0  # 0 = disabled, 24 = daily, 168 = weekly
 
 
 class UploadSourceCreate(BaseModel):
@@ -130,3 +133,26 @@ class ConversationOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# --- Analytics ---------------------------------------------------------------
+
+class DailyCount(BaseModel):
+    date: str
+    count: int
+
+
+class TopSource(BaseModel):
+    source_uri: str
+    title: str | None
+    citation_count: int
+
+
+class AnalyticsOut(BaseModel):
+    total_conversations: int
+    total_messages: int
+    conversations_today: int
+    conversations_last_7d: int
+    daily_conversations: list[DailyCount]
+    top_sources: list[TopSource]
+    recent_questions: list[str]

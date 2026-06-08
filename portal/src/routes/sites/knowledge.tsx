@@ -24,12 +24,18 @@ export function KnowledgeTab() {
   const [url, setUrl] = useState("");
   const [maxPages, setMaxPages] = useState(50);
   const [maxDepth, setMaxDepth] = useState(2);
+  const [resyncInterval, setResyncInterval] = useState(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
 
   const createUrl = useMutation({
     mutationFn: () =>
-      Sources.createUrl(siteId, { url, max_pages: maxPages, max_depth: maxDepth }),
+      Sources.createUrl(siteId, {
+        url,
+        max_pages: maxPages,
+        max_depth: maxDepth,
+        resync_interval_hours: resyncInterval,
+      }),
     onSuccess: () => {
       setUrl("");
       qc.invalidateQueries({ queryKey: ["sources", siteId] });
@@ -81,23 +87,23 @@ export function KnowledgeTab() {
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-600">
           Add a URL source
         </h2>
-        <form onSubmit={onUrlSubmit} className="grid grid-cols-1 gap-3 md:grid-cols-4">
-          <Input
-            className="md:col-span-2"
-            placeholder="https://example.com"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            required
-          />
-          <Input
-            type="number"
-            min={1}
-            max={500}
-            value={maxPages}
-            onChange={(e) => setMaxPages(Number(e.target.value))}
-            placeholder="Max pages"
-          />
-          <div className="flex gap-2">
+        <form onSubmit={onUrlSubmit} className="grid gap-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <Input
+              className="md:col-span-2"
+              placeholder="https://example.com"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              required
+            />
+            <Input
+              type="number"
+              min={1}
+              max={500}
+              value={maxPages}
+              onChange={(e) => setMaxPages(Number(e.target.value))}
+              placeholder="Max pages"
+            />
             <Input
               type="number"
               min={1}
@@ -106,6 +112,20 @@ export function KnowledgeTab() {
               onChange={(e) => setMaxDepth(Number(e.target.value))}
               placeholder="Max depth"
             />
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              Auto-sync:
+              <select
+                value={resyncInterval}
+                onChange={(e) => setResyncInterval(Number(e.target.value))}
+                className="rounded-md border border-slate-300 px-2 py-1.5 text-sm text-slate-900 focus:border-slate-500 focus:outline-none"
+              >
+                <option value={0}>Disabled</option>
+                <option value={24}>Daily</option>
+                <option value={168}>Weekly</option>
+              </select>
+            </label>
             <Button type="submit" disabled={createUrl.isPending}>
               {createUrl.isPending ? "Queueing…" : "Crawl"}
             </Button>
@@ -159,6 +179,12 @@ export function KnowledgeTab() {
                           {" "}
                           · {Object.entries(s.stats).map(([k, v]) => `${k}=${v}`).join(", ")}
                         </>
+                      ) : null}
+                      {s.type === "url" && (s.config as any)?.resync_interval_hours ? (
+                        <> · Auto-sync: {(s.config as any).resync_interval_hours === 24 ? "daily" : "weekly"}</>
+                      ) : null}
+                      {s.last_synced_at ? (
+                        <> · Last synced: {new Date(s.last_synced_at).toLocaleString()}</>
                       ) : null}
                     </div>
                     {s.error_message && (

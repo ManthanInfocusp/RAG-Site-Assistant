@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -27,6 +27,7 @@ class Site(Base, TimestampMixin):
     )
     # Theme + welcome message + persona configurable per site
     widget_config: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    system_prompt: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     owner: Mapped[User] = relationship("User", back_populates="sites")  # noqa: F821
     data_sources: Mapped[list[DataSource]] = relationship(  # noqa: F821

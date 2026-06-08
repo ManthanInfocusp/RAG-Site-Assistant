@@ -1,14 +1,17 @@
-"""Same-domain BFS crawler.
+"""Same-domain BFS crawler with sitemap support and retry.
 
 Strategy:
-1. Try fetching with `httpx` (fast, no JS).
-2. If the page has very little textual content, retry with Playwright headless.
-3. Respect robots.txt for the seed host.
-4. Cap by `max_pages` and `max_depth`.
+1. Parse sitemap.xml (from robots.txt directives or well-known path) to seed the queue.
+2. BFS crawl with httpx (fast, no JS), retrying transient errors with backoff.
+3. If a page has very little textual content, retry once with Playwright headless.
+4. Respect robots.txt for the seed host.
+5. Cap by `max_pages` and `max_depth`.
 """
 
 from __future__ import annotations
 
+import time
+import xml.etree.ElementTree as ET
 from collections import deque
 from dataclasses import dataclass
 from urllib.parse import urldefrag, urljoin, urlparse
@@ -22,6 +25,9 @@ from app.core.logging import get_logger
 from app.workers.tasks.parse import parse_html
 
 log = get_logger("crawler")
+
+_FETCH_TIMEOUT = settings.crawl_timeout_seconds
+_RETRY_DELAYS = (1, 3)  # seconds between attempts (2 retries total)
 
 
 @dataclass
@@ -62,28 +68,111 @@ def _load_robots(seed: str) -> RobotFileParser:
         rp.set_url(robots_url)
         rp.read()
     except Exception:
-        # If robots.txt is unreachable, fall back to permissive behaviour.
         rp.parse([])
     return rp
 
 
-def _fetch_static(url: str) -> str | None:
+def _fetch_robots_sitemaps(seed: str) -> list[str]:
+    """Read Sitemap: directives from robots.txt."""
+    parsed = urlparse(seed)
+    robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
+    sitemaps: list[str] = []
     try:
-        with httpx.Client(
-            timeout=settings.crawl_timeout_seconds,
-            follow_redirects=True,
-            headers={"User-Agent": settings.crawl_user_agent},
-        ) as client:
-            resp = client.get(url)
-            if resp.status_code >= 400:
-                return None
-            ctype = resp.headers.get("content-type", "")
-            if "html" not in ctype.lower():
-                return None
-            return resp.text
-    except Exception as exc:  # noqa: BLE001
-        log.warning("crawl.fetch_failed", url=url, error=str(exc))
-        return None
+        with httpx.Client(timeout=10, follow_redirects=True, headers={"User-Agent": settings.crawl_user_agent}) as c:
+            r = c.get(robots_url)
+            if r.status_code < 400:
+                for line in r.text.splitlines():
+                    if line.lower().startswith("sitemap:"):
+                        url = line.split(":", 1)[1].strip()
+                        sitemaps.append(url)
+    except Exception:
+        pass
+    return sitemaps
+
+
+def _parse_sitemap(
+    sitemap_url: str,
+    seed: str,
+    robots: RobotFileParser,
+    out: list[str],
+    visited: set[str],
+    depth: int = 0,
+) -> None:
+    if depth > 3 or sitemap_url in visited:
+        return
+    visited.add(sitemap_url)
+    try:
+        with httpx.Client(timeout=10, follow_redirects=True, headers={"User-Agent": settings.crawl_user_agent}) as c:
+            r = c.get(sitemap_url)
+            if r.status_code >= 400:
+                return
+        root = ET.fromstring(r.text)
+        ns = (root.tag.split("}")[0] + "}") if "}" in root.tag else ""
+        # Sitemap index — recurse into child sitemaps
+        for child in root.findall(f"{ns}sitemap"):
+            loc = child.find(f"{ns}loc")
+            if loc is not None and loc.text:
+                _parse_sitemap(loc.text.strip(), seed, robots, out, visited, depth + 1)
+        # Regular sitemap — collect URLs
+        for url_el in root.findall(f"{ns}url"):
+            loc = url_el.find(f"{ns}loc")
+            if loc is not None and loc.text:
+                u = _normalise(loc.text.strip())
+                if _same_host(seed, u) and robots.can_fetch(settings.crawl_user_agent, u):
+                    out.append(u)
+    except Exception as exc:
+        log.debug("sitemap.parse_failed", url=sitemap_url, error=str(exc))
+
+
+def _fetch_sitemap_urls(seed: str, robots: RobotFileParser) -> list[str]:
+    """Return deduplicated same-host URLs discovered via sitemaps."""
+    parsed = urlparse(seed)
+    candidates = _fetch_robots_sitemaps(seed)
+    if not candidates:
+        candidates = [
+            f"{parsed.scheme}://{parsed.netloc}/sitemap.xml",
+            f"{parsed.scheme}://{parsed.netloc}/sitemap_index.xml",
+        ]
+    urls: list[str] = []
+    visited_sitemaps: set[str] = set()
+    for candidate in candidates:
+        _parse_sitemap(candidate, seed, robots, urls, visited_sitemaps)
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    deduped: list[str] = []
+    for u in urls:
+        if u not in seen:
+            seen.add(u)
+            deduped.append(u)
+    log.info("sitemap.found", seed=seed, count=len(deduped))
+    return deduped
+
+
+def _fetch_static(url: str) -> str | None:
+    last_exc: Exception | None = None
+    for attempt, delay in enumerate((*_RETRY_DELAYS, None)):
+        try:
+            with httpx.Client(
+                timeout=_FETCH_TIMEOUT,
+                follow_redirects=True,
+                headers={"User-Agent": settings.crawl_user_agent},
+            ) as client:
+                resp = client.get(url)
+                if resp.status_code >= 500 and delay is not None:
+                    time.sleep(delay)
+                    continue
+                if resp.status_code >= 400:
+                    return None
+                ctype = resp.headers.get("content-type", "")
+                if "html" not in ctype.lower():
+                    return None
+                return resp.text
+        except (httpx.TimeoutException, httpx.ConnectError) as exc:
+            last_exc = exc
+            if delay is not None:
+                time.sleep(delay)
+    log.warning("crawl.fetch_failed", url=url, error=str(last_exc))
+    return None
 
 
 def _fetch_dynamic(url: str) -> str | None:
@@ -96,7 +185,7 @@ def _fetch_dynamic(url: str) -> str | None:
             try:
                 ctx = browser.new_context(user_agent=settings.crawl_user_agent)
                 page = ctx.new_page()
-                page.goto(url, wait_until="networkidle", timeout=settings.crawl_timeout_seconds * 1000)
+                page.goto(url, wait_until="networkidle", timeout=_FETCH_TIMEOUT * 1000)
                 html = page.content()
                 return html
             finally:
@@ -119,7 +208,11 @@ def crawl_site(
 
     visited: set[str] = set()
     pages: list[CrawledPage] = []
-    queue: deque[tuple[str, int]] = deque([(seed_url, 0)])
+
+    # Seed queue: sitemap URLs first (depth=0), then the seed URL itself.
+    sitemap_urls = _fetch_sitemap_urls(seed_url, robots)
+    initial = list(dict.fromkeys([seed_url, *sitemap_urls]))  # seed first, then sitemap
+    queue: deque[tuple[str, int]] = deque((u, 0) for u in initial)
 
     while queue and len(pages) < max_pages:
         url, depth = queue.popleft()
@@ -137,7 +230,6 @@ def crawl_site(
 
         text, title = parse_html(html)
         if len(text) < 200:
-            # Likely JS-rendered. Retry with Playwright.
             dyn = _fetch_dynamic(url)
             if dyn:
                 text, title = parse_html(dyn)

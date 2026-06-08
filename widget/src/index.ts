@@ -206,6 +206,19 @@ async function mount(cfg: ScriptConfig) {
     appendMessage(messagesEl, "user", text, []);
     const assistantBubble = appendMessage(messagesEl, "assistant", "", []);
 
+    // Typing indicator — three bouncing dots shown until the first token arrives.
+    const typingEl = document.createElement("span");
+    typingEl.className = "rag-typing";
+    typingEl.innerHTML = "<span></span><span></span><span></span>";
+    assistantBubble.text.appendChild(typingEl);
+    let typingRemoved = false;
+    function removeTyping() {
+      if (!typingRemoved) {
+        typingEl.remove();
+        typingRemoved = true;
+      }
+    }
+
     try {
       const body = {
         site_key: cfg.siteKey,
@@ -229,15 +242,19 @@ async function mount(cfg: ScriptConfig) {
             pendingCitations = [];
           }
         } else if (ev.event === "delta") {
+          removeTyping();
           assistantBubble.text.textContent += ev.data;
           messagesEl.scrollTop = messagesEl.scrollHeight;
         } else if (ev.event === "error") {
+          removeTyping();
           assistantBubble.text.textContent = "Sorry, something went wrong.";
         } else if (ev.event === "done") {
+          removeTyping();
           renderCitations(assistantBubble.cites, pendingCitations);
         }
       }
     } catch (err) {
+      removeTyping();
       assistantBubble.text.textContent = "Sorry, the assistant is unreachable.";
       console.error(err);
     } finally {

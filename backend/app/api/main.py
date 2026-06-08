@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth, conversations, sites, sources, widget
+from app.api.routes import analytics, auth, conversations, sites, sources, widget
 from app.core import metrics
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
@@ -50,4 +50,5 @@ app.include_router(auth.router, prefix="/v1/auth", tags=["auth"])
 app.include_router(sites.router, prefix="/v1/sites", tags=["sites"])
 app.include_router(sources.router, prefix="/v1/sources", tags=["sources"])
 app.include_router(conversations.router, prefix="/v1/conversations", tags=["conversations"])
+app.include_router(analytics.router, prefix="/v1/analytics", tags=["analytics"])
 app.include_router(widget.router, prefix="/v1/widget", tags=["widget"])

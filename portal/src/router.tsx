@@ -9,6 +9,7 @@ import { SiteLayout } from "./routes/sites/SiteLayout";
 import { KnowledgeTab } from "./routes/sites/knowledge";
 import { WidgetTab } from "./routes/sites/widget";
 import { ConversationsTab } from "./routes/sites/conversations";
+import { AnalyticsTab } from "./routes/sites/analytics";
 import { SettingsTab } from "./routes/sites/settings";
 
 export const router = createBrowserRouter([
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
           { path: "knowledge", element: <KnowledgeTab /> },
           { path: "widget", element: <WidgetTab /> },
           { path: "conversations", element: <ConversationsTab /> },
+          { path: "analytics", element: <AnalyticsTab /> },
           { path: "settings", element: <SettingsTab /> },
         ],
       },

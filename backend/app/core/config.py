@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     s3_region: str = "us-east-1"
 
     # LLM provider
-    llm_provider: Literal["openai", "ollama", "gemini"] = "openai"
+    llm_provider: Literal["openai", "ollama", "gemini", "minimax"] = "openai"
     openai_api_key: str = ""
     openai_chat_model: str = "gpt-4o-mini"
     openai_embed_model: str = "text-embedding-3-small"
@@ -47,6 +47,9 @@ class Settings(BaseSettings):
     ollama_chat_model: str = "llama3.1:8b-instruct"
     gemini_api_key: str = ""
     gemini_chat_model: str = "gemini-2.0-flash"
+    minimax_api_key: str = ""
+    minimax_chat_model: str = "MiniMax-Text-01"
+    minimax_base_url: str = "https://api.minimaxi.chat/v1"
 
     # Embeddings
     embed_provider: Literal["local", "openai"] = "local"
@@ -72,6 +75,9 @@ class Settings(BaseSettings):
     chat_max_context_chunks: int = 6
     chat_history_turns: int = 6
     chat_rate_limit_per_min: int = 30
+    # Cosine distance threshold (0=identical, 1=orthogonal, 2=opposite).
+    # Chunks above this are discarded; if none pass, the canned fallback is returned.
+    chat_context_distance_threshold: float = 0.5
 
     @property
     def cors_origins(self) -> list[str]:

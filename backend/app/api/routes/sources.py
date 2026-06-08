@@ -52,6 +52,7 @@ def create_url_source(site_id: str, payload: UrlSourceCreate, user: CurrentUser,
             "url": payload.url,
             "max_pages": payload.max_pages,
             "max_depth": payload.max_depth,
+            "resync_interval_hours": payload.resync_interval_hours,
         },
         status="pending",
     )

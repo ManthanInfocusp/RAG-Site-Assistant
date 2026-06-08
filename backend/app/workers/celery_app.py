@@ -21,6 +21,12 @@ celery_app.conf.update(
     task_acks_late=True,
     worker_prefetch_multiplier=1,
     timezone="UTC",
+    beat_schedule={
+        "check-resync-sources": {
+            "task": "check_resync_sources",
+            "schedule": 3600.0,  # every hour
+        },
+    },
 )
 
 # Discover tasks.

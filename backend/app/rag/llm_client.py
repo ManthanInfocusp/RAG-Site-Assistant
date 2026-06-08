@@ -113,10 +113,36 @@ class GeminiClient(LLMClient):
                 yield chunk.text
 
 
+class MiniMaxClient(LLMClient):
+    """MiniMax via its OpenAI-compatible chat completions endpoint."""
+
+    def __init__(self, api_key: str, model: str, base_url: str) -> None:
+        from openai import OpenAI
+
+        self._client = OpenAI(api_key=api_key, base_url=base_url)
+        self._model = model
+
+    def stream(self, messages: list[PromptMessage]) -> Iterator[str]:
+        oai_msgs = [{"role": m.role, "content": m.content} for m in messages]
+        stream = self._client.chat.completions.create(
+            model=self._model,
+            messages=oai_msgs,
+            stream=True,
+        )
+        for event in stream:
+            if not event.choices:
+                continue
+            delta = event.choices[0].delta
+            if delta and delta.content:
+                yield delta.content
+
+
 @lru_cache(maxsize=1)
 def get_llm_client() -> LLMClient:
     if settings.llm_provider == "ollama":
         return OllamaClient(settings.ollama_base_url, settings.ollama_chat_model)
     if settings.llm_provider == "gemini":
         return GeminiClient(settings.gemini_api_key, settings.gemini_chat_model)
+    if settings.llm_provider == "minimax":
+        return MiniMaxClient(settings.minimax_api_key, settings.minimax_chat_model, settings.minimax_base_url)
     return OpenAIClient(settings.openai_api_key, settings.openai_chat_model)

@@ -19,6 +19,7 @@ export interface Site {
   allowed_origins: string;
   public_key: string;
   widget_config: Record<string, unknown>;
+  system_prompt: string | null;
   created_at: string;
 }
 
@@ -59,6 +60,27 @@ export interface Conversation {
   messages: Message[];
 }
 
+export interface DailyCount {
+  date: string;
+  count: number;
+}
+
+export interface TopSource {
+  source_uri: string;
+  title: string | null;
+  citation_count: number;
+}
+
+export interface AnalyticsData {
+  total_conversations: number;
+  total_messages: number;
+  conversations_today: number;
+  conversations_last_7d: number;
+  daily_conversations: DailyCount[];
+  top_sources: TopSource[];
+  recent_questions: string[];
+}
+
 export const Auth = {
   me: () => api.get<User>("/v1/auth/me").then((r) => r.data),
   login: (email: string, password: string) =>
@@ -84,7 +106,7 @@ export const Sources = {
   get: (id: string) => api.get<DataSource>(`/v1/sources/${id}`).then((r) => r.data),
   createUrl: (
     siteId: string,
-    payload: { url: string; max_pages?: number; max_depth?: number },
+    payload: { url: string; max_pages?: number; max_depth?: number; resync_interval_hours?: number },
   ) =>
     api
       .post<DataSource>(`/v1/sources/sites/${siteId}/url`, { type: "url", ...payload })
@@ -112,4 +134,9 @@ export const Conversations = {
     api.get<Conversation[]>(`/v1/conversations/sites/${siteId}`).then((r) => r.data),
   get: (id: string) =>
     api.get<Conversation>(`/v1/conversations/${id}`).then((r) => r.data),
+};
+
+export const Analytics = {
+  get: (siteId: string) =>
+    api.get<AnalyticsData>(`/v1/analytics/sites/${siteId}`).then((r) => r.data),
 };

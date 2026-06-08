@@ -8,6 +8,7 @@ const tabs = [
   { to: "knowledge", label: "Knowledge" },
   { to: "widget", label: "Widget" },
   { to: "conversations", label: "Conversations" },
+  { to: "analytics", label: "Analytics" },
   { to: "settings", label: "Settings" },
 ];
 

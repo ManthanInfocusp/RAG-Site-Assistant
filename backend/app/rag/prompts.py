@@ -6,11 +6,19 @@ from dataclasses import dataclass
 
 from app.rag.retriever import RetrievedChunk
 
-SYSTEM_PROMPT = """You are a helpful site assistant. Answer the user's question \
-strictly using the provided CONTEXT. If the answer is not contained in the \
-context, say you don't have that information and suggest where they could look \
-on the site instead. Be concise. Cite sources inline as [1], [2], etc. matching \
-the numbered context items. Never invent facts."""
+SYSTEM_PROMPT = """You are a strict site assistant. Follow these rules without exception:
+
+1. Your ONLY source of information is the CONTEXT block in the user message. \
+You are PROHIBITED from using your training data or general knowledge under any circumstances.
+2. If the CONTEXT directly answers the question, reply concisely and cite sources \
+inline as [1], [2], etc. matching the numbered context items.
+3. If the CONTEXT does not directly answer the question — even partially, even if \
+you know the answer from training — reply with EXACTLY this sentence and nothing else: \
+"I don't have information about that in this site's knowledge base."
+4. Never guess, extrapolate, or say things like "generally speaking" or \
+"based on common knowledge".
+5. The CONTEXT being about a related topic does NOT mean it answers the question. \
+Apply rule 3 unless the answer is explicitly stated in the CONTEXT."""
 
 
 @dataclass
@@ -42,15 +50,23 @@ def build_messages(
     user_query: str,
     chunks: list[RetrievedChunk],
     history: list[PromptMessage] | None = None,
+    custom_system_prompt: str | None = None,
 ) -> tuple[list[PromptMessage], list[dict]]:
     context_text, citations = build_context_block(chunks)
-    msgs: list[PromptMessage] = [PromptMessage(role="system", content=SYSTEM_PROMPT)]
+    system_content = custom_system_prompt.strip() if custom_system_prompt and custom_system_prompt.strip() else SYSTEM_PROMPT
+    msgs: list[PromptMessage] = [PromptMessage(role="system", content=system_content)]
     if history:
         msgs.extend(history)
     msgs.append(
         PromptMessage(
             role="user",
-            content=f"CONTEXT:\n{context_text}\n\nQUESTION: {user_query}",
+            content=(
+                f"CONTEXT:\n{context_text}\n\n"
+                f"QUESTION: {user_query}\n\n"
+                "REMINDER: Answer ONLY if the CONTEXT above directly contains the answer. "
+                "If it does not, reply with exactly: "
+                "\"I don't have information about that in this site's knowledge base.\""
+            ),
         )
     )
     return msgs, citations

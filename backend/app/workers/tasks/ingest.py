@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 
@@ -127,6 +127,38 @@ def _ingest_upload(db, src: DataSource) -> dict:
         n_docs += 1
     db.commit()
     return {"files": len(keys), "documents": n_docs, "chunks": n_chunks}
+
+
+@celery_app.task(name="check_resync_sources")
+def check_resync_sources() -> dict:
+    """Periodic beat task: trigger re-ingest for URL sources whose resync interval has elapsed."""
+    db = SessionLocal()
+    triggered = 0
+    try:
+        sources = db.scalars(
+            select(DataSource).where(
+                DataSource.type == "url",
+                DataSource.status == "ready",
+            )
+        ).all()
+        now = datetime.now(UTC)
+        for src in sources:
+            interval_hours: int = src.config.get("resync_interval_hours", 0)
+            if not interval_hours or not src.last_synced_at:
+                continue
+            synced_at = src.last_synced_at
+            if synced_at.tzinfo is None:
+                synced_at = synced_at.replace(tzinfo=UTC)
+            if now - synced_at >= timedelta(hours=interval_hours):
+                src.status = "pending"
+                src.error_message = None
+                db.commit()
+                ingest_data_source.delay(src.id)
+                log.info("resync.scheduled", id=src.id, interval_hours=interval_hours)
+                triggered += 1
+    finally:
+        db.close()
+    return {"triggered": triggered}
 
 
 def _embed_and_store(db, doc: Document) -> int:
